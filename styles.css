@@ -125,6 +125,11 @@ body {
     width: 100%;
     padding: 10px;
     background: transparent; /* Remove white background for immersive space view */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 60px);
 }
 
 .game-title {
@@ -166,41 +171,89 @@ body {
 
 /* Game 1: Rocket Scientist */
 .game-settings {
-    background: #f8f9ff;
-    padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 5px solid #667eea;
+    border-radius: 20px;
+    padding: 60px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    text-align: center;
+    max-width: 700px;
+    margin: 40px auto;
 }
 
 .setting-group {
-    margin-bottom: 15px;
+    margin-bottom: 40px;
 }
 
 .setting-group label {
     display: block;
-    margin-bottom: 5px;
-    font-weight: 600;
-    color: #555;
+    margin-bottom: 15px;
+    font-weight: bold;
+    color: white;
+    font-size: 28px;
 }
 
 .setting-group input[type="number"] {
-    width: 100px;
-    padding: 8px;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    font-size: 16px;
+    width: 150px;
+    padding: 20px;
+    border: 3px solid #667eea;
+    border-radius: 12px;
+    font-size: 32px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.setting-group input[type="number"]:focus {
+    outline: none;
+    border-color: #8b9fff;
+    background: rgba(255, 255, 255, 0.15);
 }
 
 .operator-checkboxes {
     display: flex;
-    gap: 15px;
+    gap: 30px;
+    justify-content: center;
+    flex-wrap: wrap;
 }
 
 .operator-checkboxes label {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-weight: normal;
+    gap: 10px;
+    font-weight: bold;
+    color: white;
+    font-size: 32px;
+    padding: 15px 25px;
+    border: 3px solid #667eea;
+    border-radius: 12px;
+    background: rgba(102, 126, 234, 0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.operator-checkboxes label:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: #8b9fff;
+    transform: scale(1.05);
+}
+
+.operator-checkboxes label input[type="checkbox"] {
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.operator-checkboxes label:has(input:checked) {
+    background: rgba(102, 126, 234, 0.3);
+    border-color: #8b9fff;
+}
+
+.game-settings .btn-primary {
+    font-size: 36px;
+    padding: 25px 80px;
+    margin-top: 20px;
 }
 
 .gameplay {
@@ -345,6 +398,56 @@ body {
 
 .btn-restart:active {
     transform: translateX(-50%) translateY(-1px);
+}
+
+.game-end-buttons {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    z-index: 1000;
+}
+
+.game-end-buttons .btn-primary,
+.game-end-buttons .btn-secondary {
+    padding: 20px 40px;
+    font-size: 24px;
+    font-weight: bold;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    min-width: 180px;
+}
+
+.game-end-buttons .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.game-end-buttons .btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(102, 126, 234, 0.6);
+}
+
+.game-end-buttons .btn-secondary {
+    background: rgba(255, 255, 255, 0.95);
+    color: #667eea;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.game-end-buttons .btn-secondary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+    background: white;
+}
+
+.game-end-buttons .btn-primary:active,
+.game-end-buttons .btn-secondary:active {
+    transform: translateY(-1px);
 }
 
 /* Math overlay on canvas */

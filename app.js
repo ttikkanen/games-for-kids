@@ -60,6 +60,8 @@ let rocketGameState = {
     gameActive: false,
     landed: false,
     crashed: false,
+    fuelOut: false,
+    noFuelBeforeStart: false,
     orbits: 0,
     lastAngleToMoon: 0,
     angleCrossings: 0,
@@ -67,6 +69,15 @@ let rocketGameState = {
     currentProblem: 0,
     correctAnswers: 0,
     problems: [],
+    numberRange: 10,
+    operators: ['+'],
+    fuelOutTime: null,
+    fuelOutTimer: null
+};
+
+// Store last game configuration for retry
+let lastGameConfig = {
+    numProblems: 5,
     numberRange: 10,
     operators: ['+']
 };
@@ -79,17 +90,16 @@ const rocketKeys = {
 
 function initRocketGame() {
     const startBtn = document.getElementById('start-rocket');
-    const restartBtn = document.getElementById('restart-rocket');
+    const retryBtn = document.getElementById('retry-rocket');
+    const goToStartBtn = document.getElementById('go-to-start-rocket');
     const submitBtn = document.getElementById('submit-answer');
     const answerInput = document.getElementById('answer-input');
     
     startBtn.addEventListener('click', startMathProblems);
     submitBtn.addEventListener('click', submitAnswer);
-    restartBtn.addEventListener('click', () => {
-        restartBtn.style.display = 'none';
-        document.getElementById('rocket-gameplay').style.display = 'none';
-        document.querySelector('.game-settings').style.display = 'block';
-    });
+    
+    retryBtn.addEventListener('click', retryRocketGame);
+    goToStartBtn.addEventListener('click', goToStartRocket);
     
     answerInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -100,6 +110,56 @@ function initRocketGame() {
     // Arrow key listeners
     document.addEventListener('keydown', handleRocketKeyDown);
     document.addEventListener('keyup', handleRocketKeyUp);
+}
+
+function applyGameConfig(config) {
+    // Apply saved configuration to UI
+    document.getElementById('num-problems').value = config.numProblems;
+    document.getElementById('number-range').value = config.numberRange;
+    
+    // Reset operator checkboxes
+    document.getElementById('op-add').checked = false;
+    document.getElementById('op-sub').checked = false;
+    document.getElementById('op-mul').checked = false;
+    
+    // Apply saved operators
+    config.operators.forEach(op => {
+        if (op === '+') document.getElementById('op-add').checked = true;
+        if (op === '-') document.getElementById('op-sub').checked = true;
+        if (op === '×') document.getElementById('op-mul').checked = true;
+    });
+}
+
+function retryRocketGame() {
+    // Hide game end buttons and gameplay if showing
+    document.getElementById('game-end-buttons').style.display = 'none';
+    
+    // Reset no fuel state if it was set
+    if (rocketGameState.noFuelBeforeStart) {
+        document.getElementById('rocket-gameplay').style.display = 'none';
+        document.querySelector('.game-settings').style.display = 'block';
+        rocketGameState.noFuelBeforeStart = false;
+    }
+    
+    // Apply saved configuration
+    applyGameConfig(lastGameConfig);
+    
+    // Start game with same configuration
+    startMathProblems();
+}
+
+function goToStartRocket() {
+    // Hide game end buttons and gameplay
+    document.getElementById('game-end-buttons').style.display = 'none';
+    document.getElementById('rocket-gameplay').style.display = 'none';
+    
+    // Reset no fuel state if it was set
+    if (rocketGameState.noFuelBeforeStart) {
+        rocketGameState.noFuelBeforeStart = false;
+    }
+    
+    // Show settings
+    document.querySelector('.game-settings').style.display = 'block';
 }
 
 function startMathProblems() {
@@ -122,6 +182,13 @@ function startMathProblems() {
     }
     
     rocketGameState.operators = operators;
+    
+    // Save configuration for retry
+    lastGameConfig = {
+        numProblems: rocketGameState.numProblems,
+        numberRange: rocketGameState.numberRange,
+        operators: [...rocketGameState.operators]
+    };
     
     // Generate problems
     generateProblems();
@@ -171,7 +238,7 @@ function generateProblems() {
 
 function showNextProblem() {
     if (rocketGameState.currentProblem >= rocketGameState.numProblems) {
-        startRocketGame();
+        startCountdown();
         return;
     }
     
@@ -184,6 +251,51 @@ function showNextProblem() {
     document.getElementById('total-questions').textContent = rocketGameState.numProblems;
     
     document.getElementById('answer-input').focus();
+}
+
+function startCountdown() {
+    // Hide math overlay
+    document.getElementById('math-overlay').style.display = 'none';
+    
+    // Show countdown overlay
+    const canvas = document.getElementById('rocket-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let count = 3;
+    
+    function showCount() {
+        // Redraw the scene
+        drawMathScene();
+        
+        // Draw countdown text
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(canvas.width / 2 - 300, canvas.height / 2 - 200, 600, 400);
+        ctx.strokeStyle = '#667eea';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(canvas.width / 2 - 300, canvas.height / 2 - 200, 600, 400);
+        
+        if (count > 0) {
+            ctx.fillStyle = '#667eea';
+            ctx.font = 'bold 200px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(count, canvas.width / 2, canvas.height / 2 + 60);
+        } else {
+            ctx.fillStyle = '#4caf50';
+            ctx.font = 'bold 120px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('LAUNCH! 🚀', canvas.width / 2, canvas.height / 2 + 40);
+        }
+        
+        count--;
+        
+        if (count >= 0) {
+            setTimeout(showCount, 1000);
+        } else {
+            setTimeout(startRocketGame, 500);
+        }
+    }
+    
+    showCount();
 }
 
 function submitAnswer() {
@@ -215,18 +327,55 @@ function submitAnswer() {
 }
 
 function startRocketGame() {
-    // Calculate fuel based on correct answers
+    // Calculate fuel based on correct answers BEFORE resetting
     const percentage = rocketGameState.correctAnswers / rocketGameState.numProblems;
-    rocketGameState.fuel = percentage * 100;
+    const earnedFuel = percentage * 100;
     
-    // Hide math overlay
-    document.getElementById('math-overlay').style.display = 'none';
+    // Check if fuel is zero before starting
+    if (earnedFuel <= 0) {
+        // Hide math overlay
+        document.getElementById('math-overlay').style.display = 'none';
+        
+        // Show gameplay area to display the message on canvas
+        document.getElementById('rocket-gameplay').style.display = 'block';
+        
+        // Set no fuel state
+        rocketGameState.noFuelBeforeStart = true;
+        rocketGameState.gameActive = false;
+        
+        // Draw the scene with the no fuel message
+        const canvas = document.getElementById('rocket-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Load assets if needed
+        if (!spaceAssets.loaded) {
+            loadSpaceAssets().then(() => {
+                drawMathScene();
+                drawNoFuelBeforeStartMessage(ctx, canvas);
+                // Show game end buttons
+                document.getElementById('game-end-buttons').style.display = 'block';
+            });
+        } else {
+            drawMathScene();
+            drawNoFuelBeforeStartMessage(ctx, canvas);
+            // Show game end buttons
+            document.getElementById('game-end-buttons').style.display = 'block';
+        }
+        
+        return;
+    }
     
     // Reset rocket state
     resetRocketGame();
     
     // Preserve the earned fuel
-    rocketGameState.fuel = percentage * 100;
+    rocketGameState.fuel = earnedFuel;
+    
+    // Clear the canvas to remove LAUNCH text immediately
+    const canvas = document.getElementById('rocket-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // Load assets if needed
     if (!spaceAssets.loaded) {
@@ -344,25 +493,12 @@ function handleRocketKeyUp(e) {
     }
 }
 
-function startRocketGame() {
-    // Reset rocket state
-    resetRocketGame();
-    
-    // Show gameplay area
-    document.querySelector('.game-instructions').style.display = 'none';
-    document.getElementById('rocket-gameplay').style.display = 'block';
-    
-    // Load assets if needed
-    if (!spaceAssets.loaded) {
-        loadSpaceAssets().then(() => {
-            startGameLoop();
-        });
-    } else {
-        startGameLoop();
-    }
-}
-
 function resetRocketGame() {
+    // Clear fuel out timer if it exists
+    if (rocketGameState.fuelOutTimer) {
+        clearTimeout(rocketGameState.fuelOutTimer);
+    }
+    
     rocketGameState = {
         x: 300,
         y: 1600, // On Earth's surface (lower left)
@@ -376,10 +512,17 @@ function resetRocketGame() {
         gameActive: true,
         landed: false,
         crashed: false,
+        fuelOut: false,
         onGround: true,
         orbits: 0,
         lastAngleToMoon: 0,
-        angleCrossings: 0
+        angleCrossings: 0,
+        fuelOutTime: null,
+        fuelOutTimer: null,
+        // Preserve game settings
+        numProblems: rocketGameState.numProblems,
+        numberRange: rocketGameState.numberRange,
+        operators: rocketGameState.operators
     };
     
     rocketKeys.ArrowUp = false;
@@ -393,7 +536,8 @@ function startGameLoop() {
 }
 
 function updateRocketGame() {
-    if (!rocketGameState.gameActive) return;
+    // Allow drawing even when gameActive is false but fuelOut is true (to show message)
+    const shouldUpdatePhysics = rocketGameState.gameActive && !rocketGameState.fuelOut;
     
     const canvas = document.getElementById('rocket-canvas');
     const ctx = canvas.getContext('2d');
@@ -413,104 +557,128 @@ function updateRocketGame() {
     const moonRadius = 150;
     const earthRadius = 200;
     
-    // Handle rotation
-    if (rocketKeys.ArrowLeft) {
-        rocketGameState.angle -= ROTATION_SPEED;
-    }
-    if (rocketKeys.ArrowRight) {
-        rocketGameState.angle += ROTATION_SPEED;
-    }
-    
-    // Handle thrust
-    if (rocketKeys.ArrowUp && rocketGameState.fuel > 0) {
-        rocketGameState.thrust = true;
-        rocketGameState.fuel = Math.max(0, rocketGameState.fuel - FUEL_CONSUMPTION);
+    // Only update physics if game is active and fuel hasn't run out
+    if (shouldUpdatePhysics) {
+        // Handle rotation
+        if (rocketKeys.ArrowLeft) {
+            rocketGameState.angle -= ROTATION_SPEED;
+        }
+        if (rocketKeys.ArrowRight) {
+            rocketGameState.angle += ROTATION_SPEED;
+        }
         
-        // Apply thrust in direction rocket is pointing
-        rocketGameState.vx += Math.sin(rocketGameState.angle) * THRUST_POWER;
-        rocketGameState.vy -= Math.cos(rocketGameState.angle) * THRUST_POWER;
+        // Handle thrust
+        if (rocketKeys.ArrowUp && rocketGameState.fuel > 0) {
+            rocketGameState.thrust = true;
+            rocketGameState.fuel = Math.max(0, rocketGameState.fuel - FUEL_CONSUMPTION);
+            
+            // Apply thrust in direction rocket is pointing
+            rocketGameState.vx += Math.sin(rocketGameState.angle) * THRUST_POWER;
+            rocketGameState.vy -= Math.cos(rocketGameState.angle) * THRUST_POWER;
+        } else {
+            rocketGameState.thrust = false;
+        }
     } else {
         rocketGameState.thrust = false;
     }
     
-    // Apply gravity from Moon (with minimum distance to prevent extreme forces)
-    const dx_moon = moonX - rocketGameState.x;
-    const dy_moon = moonY - rocketGameState.y;
-    const dist_moon = Math.sqrt(dx_moon * dx_moon + dy_moon * dy_moon);
-    const minDist_moon = moonRadius + 50; // Minimum effective distance
-    const effectiveDist_moon = Math.max(dist_moon, minDist_moon);
-    
-    if (dist_moon > 0) {
-        const forceMoon = MOON_GRAVITY * (moonRadius * moonRadius) / (effectiveDist_moon * effectiveDist_moon);
-        rocketGameState.vx += (dx_moon / dist_moon) * forceMoon;
-        rocketGameState.vy += (dy_moon / dist_moon) * forceMoon;
+    // Check if fuel has run out during flight
+    if (rocketGameState.fuel <= 0 && rocketGameState.fuelOutTime === null && !rocketGameState.landed && !rocketGameState.crashed && !rocketGameState.fuelOut && shouldUpdatePhysics) {
+        // Record when fuel ran out and start 10-second timer
+        rocketGameState.fuelOutTime = Date.now();
+        rocketGameState.fuelOutTimer = setTimeout(() => {
+            // End game after 10 seconds
+            rocketGameState.gameActive = false;
+            rocketGameState.fuelOut = true;
+            // Show game end buttons
+            document.getElementById('game-end-buttons').style.display = 'block';
+        }, 10000);
     }
     
-    // Apply gravity from Earth (with minimum distance to prevent extreme forces)
-    const dx_earth = earthX - rocketGameState.x;
-    const dy_earth = earthY - rocketGameState.y;
-    const dist_earth = Math.sqrt(dx_earth * dx_earth + dy_earth * dy_earth);
-    
-    if (dist_earth > 0) {
-        let forceEarth = EARTH_GRAVITY / ((dist_earth * dist_earth) + 0.1);
+    // Only update physics if game is active and fuel hasn't run out
+    if (shouldUpdatePhysics) {
+        // Apply gravity from Moon (with minimum distance to prevent extreme forces)
+        const dx_moon = moonX - rocketGameState.x;
+        const dy_moon = moonY - rocketGameState.y;
+        const dist_moon = Math.sqrt(dx_moon * dx_moon + dy_moon * dy_moon);
+        const minDist_moon = moonRadius + 50; // Minimum effective distance
+        const effectiveDist_moon = Math.max(dist_moon, minDist_moon);
         
-        // Cap the maximum force to ensure thrust can overcome it
-        const maxForce = THRUST_POWER * 0.6;
-        forceEarth = Math.min(forceEarth, maxForce);
+        if (dist_moon > 0) {
+            const forceMoon = MOON_GRAVITY * (moonRadius * moonRadius) / (effectiveDist_moon * effectiveDist_moon);
+            rocketGameState.vx += (dx_moon / dist_moon) * forceMoon;
+            rocketGameState.vy += (dy_moon / dist_moon) * forceMoon;
+        }
         
-        rocketGameState.vx += (dx_earth / dist_earth) * forceEarth;
-        rocketGameState.vy += (dy_earth / dist_earth) * forceEarth;
+        // Apply gravity from Earth (with minimum distance to prevent extreme forces)
+        const dx_earth = earthX - rocketGameState.x;
+        const dy_earth = earthY - rocketGameState.y;
+        const dist_earth = Math.sqrt(dx_earth * dx_earth + dy_earth * dy_earth);
+        
+        if (dist_earth > 0) {
+            let forceEarth = EARTH_GRAVITY / ((dist_earth * dist_earth) + 0.1);
+            
+            // Cap the maximum force to ensure thrust can overcome it
+            const maxForce = THRUST_POWER * 0.6;
+            forceEarth = Math.min(forceEarth, maxForce);
+            
+            rocketGameState.vx += (dx_earth / dist_earth) * forceEarth;
+            rocketGameState.vy += (dy_earth / dist_earth) * forceEarth;
+        }
+        
+        // Track orbits around moon
+        const angleToMoon = Math.atan2(rocketGameState.y - moonY, rocketGameState.x - moonX);
+        const angleDiff = angleToMoon - rocketGameState.lastAngleToMoon;
+        
+        // Detect full orbit (crossing from -π to π or vice versa)
+        if (angleDiff > Math.PI) {
+            rocketGameState.angleCrossings--;
+        } else if (angleDiff < -Math.PI) {
+            rocketGameState.angleCrossings++;
+        }
+        
+        // Complete orbit every 360 degrees of crossing
+        if (Math.abs(rocketGameState.angleCrossings) >= 1) {
+            rocketGameState.orbits += Math.floor(Math.abs(rocketGameState.angleCrossings));
+            rocketGameState.angleCrossings = rocketGameState.angleCrossings % 1;
+        }
+        
+        rocketGameState.lastAngleToMoon = angleToMoon;
+        
+        // Update position
+        rocketGameState.x += rocketGameState.vx;
+        rocketGameState.y += rocketGameState.vy;
+        
+        // Check boundaries
+        if (rocketGameState.x < 0) {
+            rocketGameState.x = 0;
+            rocketGameState.vx *= -0.5;
+        }
+        if (rocketGameState.x > canvas.width) {
+            rocketGameState.x = canvas.width;
+            rocketGameState.vx *= -0.5;
+        }
+        if (rocketGameState.y < 0) {
+            rocketGameState.y = 0;
+            rocketGameState.vy *= -0.5;
+        }
+        if (rocketGameState.y > canvas.height) {
+            rocketGameState.y = canvas.height;
+            rocketGameState.vy *= -0.5;
+        }
+        
+        // Check collisions
+        checkCollisions(canvas, moonX, moonY, moonRadius, earthX, earthY, earthRadius);
     }
     
-    // Track orbits around moon
-    const angleToMoon = Math.atan2(rocketGameState.y - moonY, rocketGameState.x - moonX);
-    const angleDiff = angleToMoon - rocketGameState.lastAngleToMoon;
-    
-    // Detect full orbit (crossing from -π to π or vice versa)
-    if (angleDiff > Math.PI) {
-        rocketGameState.angleCrossings--;
-    } else if (angleDiff < -Math.PI) {
-        rocketGameState.angleCrossings++;
-    }
-    
-    // Complete orbit every 360 degrees of crossing
-    if (Math.abs(rocketGameState.angleCrossings) >= 1) {
-        rocketGameState.orbits += Math.floor(Math.abs(rocketGameState.angleCrossings));
-        rocketGameState.angleCrossings = rocketGameState.angleCrossings % 1;
-    }
-    
-    rocketGameState.lastAngleToMoon = angleToMoon;
-    
-    // Update position
-    rocketGameState.x += rocketGameState.vx;
-    rocketGameState.y += rocketGameState.vy;
-    
-    // Check boundaries
-    if (rocketGameState.x < 0) {
-        rocketGameState.x = 0;
-        rocketGameState.vx *= -0.5;
-    }
-    if (rocketGameState.x > canvas.width) {
-        rocketGameState.x = canvas.width;
-        rocketGameState.vx *= -0.5;
-    }
-    if (rocketGameState.y < 0) {
-        rocketGameState.y = 0;
-        rocketGameState.vy *= -0.5;
-    }
-    if (rocketGameState.y > canvas.height) {
-        rocketGameState.y = canvas.height;
-        rocketGameState.vy *= -0.5;
-    }
-    
-    // Check collisions
-    checkCollisions(canvas, moonX, moonY, moonRadius, earthX, earthY, earthRadius);
-    
-    // Draw everything
+    // Draw everything (always draw, even when fuel is out or game ended)
     drawRocketGameScene(ctx, canvas, moonX, moonY, moonRadius, earthX, earthY, earthRadius);
     
-    // Continue loop
+    // Continue loop - keep drawing if fuel is out to show the message
     if (rocketGameState.gameActive && !rocketGameState.landed && !rocketGameState.crashed) {
+        requestAnimationFrame(updateRocketGame);
+    } else if (rocketGameState.fuelOut && !rocketGameState.landed && !rocketGameState.crashed) {
+        // Continue drawing when fuel is out to show the message (one frame is enough)
         requestAnimationFrame(updateRocketGame);
     }
 }
@@ -533,9 +701,15 @@ function checkCollisions(canvas, moonX, moonY, moonRadius, earthX, earthY, earth
             // Crash if moving towards Earth AND going too fast
             rocketGameState.crashed = true;
             rocketGameState.gameActive = false;
-            // Delay showing restart button for 3 seconds to see explosion
+            rocketGameState.fuelOut = false; // Override fuel out if crashed
+            // Clear fuel out timer if running
+            if (rocketGameState.fuelOutTimer) {
+                clearTimeout(rocketGameState.fuelOutTimer);
+                rocketGameState.fuelOutTimer = null;
+            }
+            // Delay showing game end buttons for 3 seconds to see explosion
             setTimeout(() => {
-                document.getElementById('restart-rocket').style.display = 'block';
+                document.getElementById('game-end-buttons').style.display = 'block';
             }, 3000);
         } else {
             // Stop on surface (resting)
@@ -558,19 +732,31 @@ function checkCollisions(canvas, moonX, moonY, moonRadius, earthX, earthY, earth
             // Crash if moving towards Moon AND going too fast
             rocketGameState.crashed = true;
             rocketGameState.gameActive = false;
-            // Delay showing restart button for 3 seconds to see explosion
+            rocketGameState.fuelOut = false; // Override fuel out if crashed
+            // Clear fuel out timer if running
+            if (rocketGameState.fuelOutTimer) {
+                clearTimeout(rocketGameState.fuelOutTimer);
+                rocketGameState.fuelOutTimer = null;
+            }
+            // Delay showing game end buttons for 3 seconds to see explosion
             setTimeout(() => {
-                document.getElementById('restart-rocket').style.display = 'block';
+                document.getElementById('game-end-buttons').style.display = 'block';
             }, 3000);
         } else {
             // Successful landing on Moon!
             rocketGameState.landed = true;
             rocketGameState.gameActive = false;
+            rocketGameState.fuelOut = false; // Override fuel out if landed
             rocketGameState.vx = 0;
             rocketGameState.vy = 0;
-            // Delay showing restart button for 1 second
+            // Clear fuel out timer if running
+            if (rocketGameState.fuelOutTimer) {
+                clearTimeout(rocketGameState.fuelOutTimer);
+                rocketGameState.fuelOutTimer = null;
+            }
+            // Delay showing game end buttons for 1 second
             setTimeout(() => {
-                document.getElementById('restart-rocket').style.display = 'block';
+                document.getElementById('game-end-buttons').style.display = 'block';
             }, 1000);
         }
     }
@@ -792,9 +978,48 @@ function drawRocketGameScene(ctx, canvas, moonX, moonY, moonRadius, earthX, eart
         ctx.fillStyle = '#ffeb3b';
         const score = 100 + (rocketGameState.orbits * 50);
         ctx.fillText(`${t('score')} ${score}`, canvas.width / 2, canvas.height / 2 + 150);
+    } else if (rocketGameState.fuelOut) {
+        // Fuel out message
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(canvas.width / 2 - 600, canvas.height / 2 - 200, 1200, 400);
+        ctx.strokeStyle = '#ffa500';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(canvas.width / 2 - 600, canvas.height / 2 - 200, 1200, 400);
+        
+        ctx.fillStyle = '#ffa500';
+        ctx.font = 'bold 96px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('⛽ ' + t('fuelOutDuringFlight'), canvas.width / 2, canvas.height / 2 - 40);
+        
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 48px Arial';
+        ctx.fillText(`${t('completedOrbits')} ${rocketGameState.orbits} ${t('orbitsText')}`, canvas.width / 2, canvas.height / 2 + 60);
+    }
+    
+    // Draw no fuel before start message if applicable
+    if (rocketGameState.noFuelBeforeStart) {
+        drawNoFuelBeforeStartMessage(ctx, canvas);
     }
     
     ctx.textAlign = 'left';
+}
+
+function drawNoFuelBeforeStartMessage(ctx, canvas) {
+    // No fuel before start message
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(canvas.width / 2 - 600, canvas.height / 2 - 200, 1200, 400);
+    ctx.strokeStyle = '#ff6666';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(canvas.width / 2 - 600, canvas.height / 2 - 200, 1200, 400);
+    
+    ctx.fillStyle = '#ff6666';
+    ctx.font = 'bold 96px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('⛽ ' + t('noFuelBeforeStart'), canvas.width / 2, canvas.height / 2 - 40);
+    
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 48px Arial';
+    ctx.fillText(t('noFuelBeforeStartSubtext'), canvas.width / 2, canvas.height / 2 + 60);
 }
 
 // ============================
