@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kids Games - Lasten Pelit</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Left Menu -->
+        <aside class="sidebar">
+            <div class="language-switcher">
+                <button class="lang-btn" data-lang="en" title="English">
+                    <span class="flag">🇬🇧</span>
+                </button>
+                <button class="lang-btn" data-lang="fi" title="Suomi">
+                    <span class="flag">🇫🇮</span>
+                </button>
+            </div>
+            
+            <h1 class="app-title" data-i18n="appTitle">Kids Games</h1>
+            
+            <nav class="game-menu">
+                <button class="game-btn active" data-game="rocket" data-i18n="gameRocket">
+                    🚀 Rocket Scientist
+                </button>
+                <button class="game-btn" data-game="path" data-i18n="gamePath">
+                    🍎 Shortest Path
+                </button>
+                <button class="game-btn" data-game="draw" data-i18n="gameDraw">
+                    🎨 Drawing
+                </button>
+                <button class="game-btn" data-game="tower" data-i18n="gameTower">
+                    🏗️ Tower Builder
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Game Area -->
+        <main class="game-area">
+            <!-- Game 1: Rocket Scientist -->
+            <div id="rocket-game" class="game-container active">
+                <h2 class="game-title" data-i18n="gameRocket">🚀 Rocket Scientist</h2>
+                
+                <div class="game-settings">
+                    <div class="setting-group">
+                        <label data-i18n="numProblems">Number of Problems:</label>
+                        <input type="number" id="num-problems" min="3" max="10" value="5">
+                    </div>
+                    <div class="setting-group">
+                        <label data-i18n="numberRange">Number Range:</label>
+                        <input type="number" id="number-range" min="10" max="100" value="10" step="10">
+                    </div>
+                    <div class="setting-group">
+                        <label data-i18n="operators">Operators:</label>
+                        <div class="operator-checkboxes">
+                            <label><input type="checkbox" id="op-add" checked> +</label>
+                            <label><input type="checkbox" id="op-sub"> -</label>
+                            <label><input type="checkbox" id="op-mul"> ×</label>
+                        </div>
+                    </div>
+                    <button id="start-rocket" class="btn-primary" data-i18n="start">Start</button>
+                </div>
+
+                <div id="rocket-gameplay" class="gameplay" style="display: none;">
+                    <canvas id="rocket-canvas" width="3840" height="2160"></canvas>
+                    
+                    <!-- Math problem overlay -->
+                    <div id="math-overlay" style="display: none;">
+                        <div class="problem-area-overlay">
+                            <div class="problem-display">
+                                <span id="problem-text" class="problem-text">5 + 3 = ?</span>
+                            </div>
+                            <input type="number" id="answer-input" class="answer-input" placeholder="?">
+                            <button id="submit-answer" class="btn-primary" data-i18n="submit">Submit</button>
+                            <div id="feedback" class="feedback"></div>
+                            
+                            <div class="progress-info">
+                                <span data-i18n="question">Question</span> <span id="current-question">1</span>/<span id="total-questions">5</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button id="restart-rocket" class="btn-restart" style="display: none;" data-i18n="restart">Restart</button>
+                </div>
+            </div>
+
+            <!-- Game 2: Shortest Path -->
+            <div id="path-game" class="game-container">
+                <h2 class="game-title" data-i18n="gamePath">🍎 Shortest Path</h2>
+                
+                <div class="game-stats">
+                    <div class="stat-item">
+                        <span data-i18n="steps">Steps:</span> <span id="steps-count">0</span>
+                    </div>
+                    <div class="fruit-basket" id="fruit-basket"></div>
+                </div>
+
+                <div class="stars-display" id="stars-display"></div>
+
+                <canvas id="path-canvas" width="800" height="600"></canvas>
+                
+                <button id="new-path-game" class="btn-primary" data-i18n="newGame">New Game</button>
+            </div>
+
+            <!-- Game 3: Drawing -->
+            <div id="draw-game" class="game-container">
+                <h2 class="game-title" data-i18n="gameDraw">🎨 Drawing</h2>
+                
+                <div class="draw-controls">
+                    <div class="control-group">
+                        <label data-i18n="color">Color:</label>
+                        <input type="color" id="draw-color" value="#000000">
+                    </div>
+                    <div class="control-group">
+                        <label data-i18n="brushSize">Brush Size:</label>
+                        <input type="range" id="brush-size" min="1" max="50" value="5">
+                        <span id="brush-size-display">5</span>
+                    </div>
+                    <div class="control-group">
+                        <label data-i18n="tool">Tool:</label>
+                        <select id="draw-tool">
+                            <option value="brush" data-i18n="brush">Brush</option>
+                            <option value="eraser" data-i18n="eraser">Eraser</option>
+                        </select>
+                    </div>
+                    <button id="clear-canvas" class="btn-secondary" data-i18n="clear">Clear</button>
+                </div>
+
+                <canvas id="draw-canvas" width="800" height="600"></canvas>
+            </div>
+
+            <!-- Game 4: Tower Builder -->
+            <div id="tower-game" class="game-container">
+                <h2 class="game-title" data-i18n="gameTower">🏗️ Tower Builder</h2>
+                
+                <div class="tower-controls">
+                    <button class="shape-btn" data-shape="box">
+                        <div class="shape-preview box-preview"></div>
+                        <span data-i18n="cube">Cube</span>
+                    </button>
+                    <button class="shape-btn" data-shape="circle">
+                        <div class="shape-preview circle-preview"></div>
+                        <span data-i18n="circle">Circle</span>
+                    </button>
+                    <button class="shape-btn" data-shape="triangle">
+                        <div class="shape-preview triangle-preview"></div>
+                        <span data-i18n="triangle">Triangle</span>
+                    </button>
+                    <button id="reset-tower" class="btn-secondary" data-i18n="reset">Reset</button>
+                </div>
+
+                <div class="tower-stats">
+                    <span data-i18n="height">Height:</span> <span id="tower-height">0</span> <span data-i18n="units">units</span>
+                </div>
+
+                <canvas id="tower-canvas" width="800" height="600"></canvas>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="translations.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
