@@ -34,6 +34,9 @@
                 <button class="game-btn" data-game="tower" data-i18n="gameTower">
                     🏗️ Tower Builder
                 </button>
+                <button class="game-btn" data-game="pokepath" data-i18n="gamePokepath">
+                    ⚾ Pokemon Path
+                </button>
             </nav>
         </aside>
 
@@ -159,6 +162,30 @@
                 </div>
 
                 <canvas id="tower-canvas" width="800" height="600"></canvas>
+            </div>
+            <!-- Game 5: Pokemon Path -->
+            <div id="pokepath-game" class="game-container">
+                <h2 class="game-title" data-i18n="gamePokepath">⚾ Pokemon Path</h2>
+
+                <div class="game-stats">
+                    <div class="stat-item">
+                        <span data-i18n="steps">Steps:</span> <span id="pokepath-steps">0</span>
+                    </div>
+                    <div class="stat-item" id="pokepath-count">⚾ ×0</div>
+                </div>
+
+                <div id="pokepath-reveal" class="pokemon-reveal" style="display:none;">
+                    <div id="pokepath-reveal-stars" class="reveal-stars"></div>
+                    <canvas id="pokepath-portrait" class="pokemon-portrait-canvas" width="150" height="150"></canvas>
+                    <div class="reveal-text">You caught <strong id="pokepath-reveal-name"></strong>!</div>
+                    <div class="reveal-hint">Press Space / Enter or tap to continue</div>
+                </div>
+
+                <canvas id="pokepath-canvas" width="600" height="600"></canvas>
+
+                <div id="pokepath-pokedex" class="pokedex-container" style="display:none;"></div>
+
+                <button id="new-pokepath-game" class="btn-primary" data-i18n="newGame">New Game</button>
             </div>
         </main>
     </div>

@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initPathGame();
     initDrawGame();
     initTowerGame();
+    initPokepathGame();
 });
 
 function switchGame(gameName) {
@@ -1527,3 +1528,603 @@ function resetTower() {
     document.getElementById('tower-height').textContent = '0';
 }
 
+
+// ============================
+// GAME 5: POKEMON PATH
+// ============================
+
+const pokemonNames = [
+    'Bulbasaur', 'Ivysaur', 'Venusaur', 'Charmander', 'Charmeleon', 'Charizard',
+    'Squirtle', 'Wartortle', 'Blastoise', 'Caterpie', 'Metapod', 'Butterfree',
+    'Weedle', 'Kakuna', 'Beedrill', 'Pidgey', 'Pidgeotto', 'Pidgeot',
+    'Rattata', 'Raticate', 'Spearow', 'Fearow', 'Ekans', 'Arbok',
+    'Pikachu', 'Raichu', 'Sandshrew', 'Sandslash', 'Nidoran♀', 'Nidorina',
+    'Nidoqueen', 'Nidoran♂', 'Nidorino', 'Nidoking', 'Clefairy', 'Clefable',
+    'Vulpix', 'Ninetales', 'Jigglypuff', 'Wigglytuff', 'Zubat', 'Golbat',
+    'Oddish', 'Gloom', 'Vileplume', 'Paras', 'Parasect', 'Venonat', 'Venomoth',
+    'Diglett', 'Dugtrio', 'Meowth', 'Persian', 'Psyduck', 'Golduck',
+    'Mankey', 'Primeape', 'Growlithe', 'Arcanine', 'Poliwag', 'Poliwhirl',
+    'Poliwrath', 'Abra', 'Kadabra', 'Alakazam', 'Machop', 'Machoke', 'Machamp',
+    'Bellsprout', 'Weepinbell', 'Victreebel', 'Tentacool', 'Tentacruel',
+    'Geodude', 'Graveler', 'Golem', 'Ponyta', 'Rapidash', 'Slowpoke', 'Slowbro',
+    'Magnemite', 'Magneton', "Farfetch'd", 'Doduo', 'Dodrio', 'Seel', 'Dewgong',
+    'Grimer', 'Muk', 'Shellder', 'Cloyster', 'Gastly', 'Haunter', 'Gengar',
+    'Onix', 'Drowzee', 'Hypno', 'Krabby', 'Kingler', 'Voltorb', 'Electrode',
+    'Exeggcute', 'Exeggutor', 'Cubone', 'Marowak', 'Hitmonlee', 'Hitmonchan',
+    'Lickitung', 'Koffing', 'Weezing', 'Rhyhorn', 'Rhydon', 'Chansey', 'Tangela',
+    'Kangaskhan', 'Horsea', 'Seadra', 'Goldeen', 'Seaking', 'Staryu', 'Starmie',
+    'Mr. Mime', 'Scyther', 'Jynx', 'Electabuzz', 'Magmar', 'Pinsir', 'Tauros',
+    'Magikarp', 'Gyarados', 'Lapras', 'Ditto', 'Eevee', 'Vaporeon', 'Jolteon',
+    'Flareon', 'Porygon', 'Omanyte', 'Omastar', 'Kabuto', 'Kabutops',
+    'Aerodactyl', 'Snorlax', 'Articuno', 'Zapdos', 'Moltres', 'Dratini',
+    'Dragonair', 'Dragonite', 'Mewtwo', 'Mew'
+];
+
+// ===== Pokemon Portrait Generator =====
+
+function hashString(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = (Math.imul(h, 33) ^ str.charCodeAt(i)) >>> 0;
+    return h;
+}
+
+function makeRng(seed) {
+    let s = seed >>> 0;
+    return {
+        next()      { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 0x100000000; },
+        range(a, b) { return a + this.next() * (b - a); },
+        int(a, b)   { return Math.floor(this.range(a, b)); },
+        bool(p=0.5) { return this.next() < p; }
+    };
+}
+
+const _portraitCache = {};
+
+function getPokemonPortraitDataURL(name, size) {
+    const key = `${name}@${size}`;
+    if (!_portraitCache[key]) {
+        const c = document.createElement('canvas');
+        c.width = size; c.height = size;
+        drawPokemonPortrait(c.getContext('2d'), name, 0, 0, size);
+        _portraitCache[key] = c.toDataURL();
+    }
+    return _portraitCache[key];
+}
+
+function drawPokemonPortrait(ctx, name, x, y, size) {
+    const rng = makeRng(hashString(name));
+
+    // === Generate ALL params in fixed order (order determines determinism) ===
+    const hue         = rng.range(0, 360);
+    const sat         = rng.range(55, 85);
+    const aHueOff     = rng.range(40, 320);
+    const aSat        = rng.range(55, 80);
+    const bodyType    = rng.int(0, 5);   // 0=round,1=tall,2=wide,3=pear,4=squat
+    const earType     = rng.int(0, 6);   // 0=none,1=round,2=pointed,3=long,4=cat,5=floppy
+    const hornType    = rng.int(0, 5);   // 0=none,1=single,2=double,3=antennae,4=crown
+    const tailType    = rng.int(0, 6);   // 0=none,1=curl,2=zigzag,3=fan,4=ball-tip,5=curve
+    const markType    = rng.int(0, 4);   // 0=none,1=belly,2=stripes,3=spots
+    const eyeStyle    = rng.int(0, 4);   // 0=round,1=oval,2=half-closed,3=X
+    const eyeSpF      = rng.range(0.45, 0.70);
+    const eyeYOff     = rng.range(-0.18, 0.08);
+    const eyeRF       = rng.range(0.22, 0.36);
+    const mouthType   = rng.int(0, 4);
+    const hasNose     = rng.bool(0.5);
+    const noseType    = rng.int(0, 3);
+    const hasBlush    = rng.bool(0.42);
+    const hasWings    = rng.bool(0.18);
+    const hasMane     = rng.bool(0.20);
+    const stripeCount = rng.int(2, 5);
+    const stripeAngle = rng.range(-0.3, 0.3);
+    const spotCount   = rng.int(3, 7);
+    const spots       = Array.from({length: 7}, () => ({
+        fx: rng.range(-0.7, 0.7), fy: rng.range(-0.7, 0.7), fr: rng.range(0.055, 0.12)
+    }));
+
+    // === Colors ===
+    const aHue = (hue + aHueOff) % 360;
+    const C = {
+        body:     `hsl(${hue},${sat}%,62%)`,
+        bodyDk:   `hsl(${hue},${sat - 5}%,35%)`,
+        bodyLt:   `hsl(${hue},${sat - 20}%,84%)`,
+        belly:    `hsl(${hue},${sat - 25}%,90%)`,
+        accent:   `hsl(${aHue},${aSat}%,56%)`,
+        accentDk: `hsl(${aHue},${aSat}%,30%)`,
+        bg:       `hsl(${hue},${Math.max(sat - 35, 20)}%,94%)`,
+    };
+
+    // === Layout ===
+    const cx  = x + size * 0.5;
+    const cy  = y + size * 0.62;
+    const r   = size * 0.22;
+    const [bw, bh] = [[r,r],[r*0.8,r*1.22],[r*1.2,r*0.82],[r*0.9,r*1.12],[r*1.1,r*0.8]][bodyType];
+    const headR = r * 0.65;
+    const headY = cy - bh * 0.82 - headR * 0.5;
+
+    // --- Background circle ---
+    ctx.fillStyle = C.bg;
+    ctx.beginPath();
+    ctx.arc(cx, y + size * 0.5, size * 0.46, 0, Math.PI * 2);
+    ctx.fill();
+
+    // --- Wings (behind body) ---
+    if (hasWings) {
+        [-1, 1].forEach(s => {
+            ctx.fillStyle = C.accent; ctx.strokeStyle = C.accentDk; ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(cx + s * bw * 0.7, cy - bh * 0.2);
+            ctx.bezierCurveTo(cx + s * bw * 1.6, cy - bh * 0.7, cx + s * bw * 1.7, cy + bh * 0.2, cx + s * bw * 0.8, cy + bh * 0.25);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+        });
+    }
+
+    // --- Mane (behind head) ---
+    if (hasMane) {
+        ctx.fillStyle = C.accent;
+        for (let m = 0; m < 6; m++) {
+            const ang = (m / 6) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.arc(cx + Math.cos(ang) * headR * 0.92, headY + Math.sin(ang) * headR * 0.72, headR * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // --- Tail ---
+    if (tailType > 0) {
+        const tx = cx + bw * 0.88, ty = cy + bh * 0.22;
+        ctx.lineWidth = size * 0.048; ctx.lineCap = 'round';
+        switch (tailType) {
+            case 1: ctx.strokeStyle = C.body; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.bezierCurveTo(tx+size*0.26, ty+size*0.02, tx+size*0.30, ty-size*0.28, tx+size*0.14, ty-size*0.34); ctx.stroke(); break;
+            case 2: ctx.strokeStyle = C.accent; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(tx+size*0.10,ty-size*0.14); ctx.lineTo(tx+size*0.20,ty-size*0.06); ctx.lineTo(tx+size*0.13,ty-size*0.28); ctx.lineTo(tx+size*0.23,ty-size*0.22); ctx.stroke(); break;
+            case 3: ctx.fillStyle = C.accent; ctx.beginPath(); ctx.moveTo(tx,ty); [[size*0.09,-size*0.22],[size*0.19,-size*0.10],[size*0.16,-size*0.32],[size*0.28,-size*0.18]].forEach(([dx,dy])=>ctx.lineTo(tx+dx,ty+dy)); ctx.closePath(); ctx.fill(); break;
+            case 4: ctx.strokeStyle = C.body; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.quadraticCurveTo(tx+size*0.20,ty-size*0.12,tx+size*0.15,ty-size*0.28); ctx.stroke(); ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(tx+size*0.15,ty-size*0.31,size*0.065,0,Math.PI*2); ctx.fill(); break;
+            case 5: ctx.strokeStyle = C.body; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.quadraticCurveTo(tx+size*0.18,ty-size*0.18,tx+size*0.10,ty-size*0.36); ctx.stroke(); break;
+        }
+    }
+
+    // --- Body ---
+    ctx.fillStyle = C.body; ctx.strokeStyle = C.bodyDk; ctx.lineWidth = size * 0.025;
+    ctx.beginPath(); ctx.ellipse(cx, cy, bw, bh, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // --- Body markings ---
+    if (markType === 1) {
+        ctx.fillStyle = C.belly; ctx.beginPath(); ctx.ellipse(cx, cy + bh * 0.1, bw * 0.55, bh * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (markType === 2) {
+        ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, bw, bh, 0, 0, Math.PI * 2); ctx.clip();
+        ctx.strokeStyle = C.bodyDk; ctx.lineWidth = size * 0.022;
+        for (let s = 0; s < stripeCount; s++) {
+            const sy = cy - bh + bh * 2 / (stripeCount - 1) * s;
+            ctx.beginPath(); ctx.moveTo(cx - bw * 1.5, sy - Math.tan(stripeAngle) * bw * 1.5); ctx.lineTo(cx + bw * 1.5, sy + Math.tan(stripeAngle) * bw * 1.5); ctx.stroke();
+        }
+        ctx.restore();
+    } else if (markType === 3) {
+        ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, bw, bh, 0, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = C.accent;
+        spots.slice(0, spotCount).forEach(sp => { ctx.beginPath(); ctx.arc(cx + sp.fx * bw, cy + sp.fy * bh, sp.fr * size, 0, Math.PI * 2); ctx.fill(); });
+        ctx.restore();
+    }
+
+    // --- Head ---
+    ctx.fillStyle = C.body; ctx.strokeStyle = C.bodyDk; ctx.lineWidth = size * 0.022;
+    ctx.beginPath(); ctx.arc(cx, headY, headR, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // --- Eyes ---
+    const eyeSp = headR * eyeSpF;
+    const eyeY  = headY + eyeYOff * headR;
+    const eyeR  = headR * eyeRF;
+    [-1, 1].forEach(s => {
+        const ex = cx + s * eyeSp;
+        if (eyeStyle === 3) {
+            ctx.strokeStyle = '#222'; ctx.lineWidth = Math.max(1.5, size * 0.018); ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(ex - eyeR*0.55, eyeY - eyeR*0.55); ctx.lineTo(ex + eyeR*0.55, eyeY + eyeR*0.55);
+            ctx.moveTo(ex + eyeR*0.55, eyeY - eyeR*0.55); ctx.lineTo(ex - eyeR*0.55, eyeY + eyeR*0.55); ctx.stroke();
+        } else {
+            ctx.fillStyle = 'white'; ctx.beginPath();
+            eyeStyle === 2 ? ctx.arc(ex, eyeY + eyeR * 0.35, eyeR, Math.PI, 0) : ctx.arc(ex, eyeY, eyeR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#111827'; ctx.beginPath(); ctx.arc(ex + s * eyeR * 0.15, eyeY + eyeR * 0.08, eyeR * 0.58, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(ex + s * eyeR * 0.05 - eyeR * 0.2, eyeY - eyeR * 0.22, eyeR * 0.22, 0, Math.PI * 2); ctx.fill();
+        }
+    });
+
+    // --- Blush ---
+    if (hasBlush) {
+        ctx.fillStyle = `hsl(${hue + 30},80%,72%)`; ctx.globalAlpha = 0.45;
+        [-1, 1].forEach(s => { ctx.beginPath(); ctx.ellipse(cx + s * eyeSp * 1.15, eyeY + eyeR * 1.3, eyeR * 0.72, eyeR * 0.42, 0, 0, Math.PI * 2); ctx.fill(); });
+        ctx.globalAlpha = 1;
+    }
+
+    // --- Nose ---
+    if (hasNose) {
+        const ny = (eyeY + headY + headR * 0.62) * 0.5;
+        ctx.fillStyle = C.bodyDk;
+        if (noseType < 2) { ctx.beginPath(); ctx.arc(cx, ny, headR * 0.055, 0, Math.PI * 2); ctx.fill(); }
+        else { [-1,1].forEach(s => { ctx.beginPath(); ctx.arc(cx + s * headR * 0.09, ny, headR * 0.04, 0, Math.PI * 2); ctx.fill(); }); }
+    }
+
+    // --- Mouth ---
+    const my = headY + headR * 0.44;
+    ctx.strokeStyle = C.bodyDk; ctx.lineWidth = Math.max(1.2, size * 0.02); ctx.lineCap = 'round';
+    switch (mouthType) {
+        case 0: ctx.beginPath(); ctx.arc(cx, my, headR * 0.18, 0.15, Math.PI - 0.15); ctx.stroke(); break;
+        case 1: ctx.fillStyle = C.bodyDk; ctx.beginPath(); ctx.arc(cx, my, headR * 0.07, 0, Math.PI * 2); ctx.fill(); break;
+        case 2: ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(cx, my, headR * 0.17, 0.1, Math.PI - 0.1); ctx.fill(); ctx.strokeStyle = C.bodyDk; ctx.beginPath(); ctx.arc(cx, my, headR * 0.17, 0.1, Math.PI - 0.1); ctx.stroke(); break;
+        case 3: ctx.beginPath(); ctx.moveTo(cx - headR * 0.15, my); ctx.lineTo(cx + headR * 0.15, my); ctx.stroke(); break;
+    }
+
+    // --- Ears ---
+    const earBaseY = headY - headR * 0.55;
+    if (earType > 0) {
+        switch (earType) {
+            case 1: [-1,1].forEach(s => { ctx.fillStyle=C.body; ctx.strokeStyle=C.bodyDk; ctx.lineWidth=size*0.02; ctx.beginPath(); ctx.arc(cx+s*headR*0.65,earBaseY,headR*0.3,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle=C.accent; ctx.beginPath(); ctx.arc(cx+s*headR*0.65,earBaseY,headR*0.18,0,Math.PI*2); ctx.fill(); }); break;
+            case 2: [-1,1].forEach(s => { ctx.fillStyle=C.body; ctx.strokeStyle=C.bodyDk; ctx.lineWidth=size*0.02; ctx.beginPath(); ctx.moveTo(cx+s*headR*0.50,earBaseY+headR*0.12); ctx.lineTo(cx+s*headR*0.85,earBaseY-headR*0.58); ctx.lineTo(cx+s*headR*0.25,earBaseY-headR*0.08); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle=C.accent; ctx.beginPath(); ctx.moveTo(cx+s*headR*0.50,earBaseY+headR*0.05); ctx.lineTo(cx+s*headR*0.78,earBaseY-headR*0.46); ctx.lineTo(cx+s*headR*0.32,earBaseY-headR*0.02); ctx.closePath(); ctx.fill(); }); break;
+            case 3: [-1,1].forEach(s => { ctx.fillStyle=C.body; ctx.strokeStyle=C.bodyDk; ctx.lineWidth=size*0.02; ctx.beginPath(); ctx.ellipse(cx+s*headR*0.42,earBaseY-headR*0.55,headR*0.2,headR*0.52,s*0.18,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle=C.accent; ctx.beginPath(); ctx.ellipse(cx+s*headR*0.42,earBaseY-headR*0.55,headR*0.1,headR*0.36,s*0.18,0,Math.PI*2); ctx.fill(); }); break;
+            case 4: [-1,1].forEach(s => { ctx.fillStyle=C.body; ctx.strokeStyle=C.bodyDk; ctx.lineWidth=size*0.02; ctx.beginPath(); ctx.moveTo(cx+s*headR*0.35,earBaseY+headR*0.05); ctx.lineTo(cx+s*headR*0.72,earBaseY-headR*0.52); ctx.lineTo(cx+s*headR*0.75,earBaseY+headR*0.05); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle=C.accent; ctx.beginPath(); ctx.moveTo(cx+s*headR*0.42,earBaseY); ctx.lineTo(cx+s*headR*0.67,earBaseY-headR*0.4); ctx.lineTo(cx+s*headR*0.68,earBaseY); ctx.closePath(); ctx.fill(); }); break;
+            case 5: [-1,1].forEach(s => { ctx.fillStyle=C.body; ctx.strokeStyle=C.bodyDk; ctx.lineWidth=size*0.02; ctx.beginPath(); ctx.moveTo(cx+s*headR*0.50,earBaseY+headR*0.10); ctx.bezierCurveTo(cx+s*headR*0.90,earBaseY,cx+s*headR*0.92,earBaseY+headR*0.65,cx+s*headR*0.62,earBaseY+headR*0.62); ctx.bezierCurveTo(cx+s*headR*0.40,earBaseY+headR*0.60,cx+s*headR*0.38,earBaseY+headR*0.22,cx+s*headR*0.50,earBaseY+headR*0.10); ctx.closePath(); ctx.fill(); ctx.stroke(); }); break;
+        }
+    }
+
+    // --- Horns / crown ---
+    if (hornType > 0) {
+        ctx.fillStyle = C.accent; ctx.strokeStyle = C.accentDk; ctx.lineWidth = size * 0.018; ctx.lineCap = 'round';
+        switch (hornType) {
+            case 1: ctx.beginPath(); ctx.moveTo(cx-headR*0.11,headY-headR*0.68); ctx.lineTo(cx+headR*0.11,headY-headR*0.68); ctx.lineTo(cx,headY-headR*1.22); ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+            case 2: [-1,1].forEach(s => { ctx.beginPath(); ctx.moveTo(cx+s*headR*0.22-headR*0.09,headY-headR*0.65); ctx.lineTo(cx+s*headR*0.22+headR*0.09,headY-headR*0.65); ctx.lineTo(cx+s*headR*0.30,headY-headR*1.10); ctx.closePath(); ctx.fill(); ctx.stroke(); }); break;
+            case 3: ctx.strokeStyle=C.body; ctx.lineWidth=size*0.03; [-1,1].forEach(s => { ctx.beginPath(); ctx.moveTo(cx+s*headR*0.25,headY-headR*0.72); ctx.quadraticCurveTo(cx+s*headR*0.55,headY-headR*1.15,cx+s*headR*0.48,headY-headR*1.34); ctx.stroke(); ctx.fillStyle=C.accent; ctx.beginPath(); ctx.arc(cx+s*headR*0.48,headY-headR*1.36,headR*0.10,0,Math.PI*2); ctx.fill(); }); break;
+            case 4: {
+                const pts = [-0.38,-0.14,0,0.14,0.38], hts = [0.58,0.42,0.72,0.42,0.58];
+                ctx.beginPath(); ctx.moveTo(cx-headR*0.44,headY-headR*0.68);
+                pts.forEach((xf,i) => { ctx.lineTo(cx+xf*headR,headY-headR*(0.68+hts[i])); if(i<pts.length-1) ctx.lineTo(cx+(xf+pts[i+1])*headR*0.5,headY-headR*0.68); });
+                ctx.lineTo(cx+headR*0.44,headY-headR*0.68); ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+            }
+        }
+    }
+}
+
+let pokepathState = {
+    gridSize: 15,
+    cellSize: 40,
+    playerPos: { x: 0, y: 0 },
+    pokeballPos: { x: 0, y: 0 },
+    obstacles: [],
+    steps: 0,
+    optimalSteps: 0,
+    collectedCount: 0,
+    caughtPokemon: [],
+    currentPokemon: null,
+    isAnimating: false
+};
+
+function initPokepathGame() {
+    document.getElementById('new-pokepath-game').addEventListener('click', startPokepathGame);
+
+    document.addEventListener('keydown', (e) => {
+        if (currentGame === 'pokepath' && !pokepathState.isAnimating &&
+            ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+             'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(e.key)) {
+            e.preventDefault();
+            const keyMap = { w: 'ArrowUp', W: 'ArrowUp', s: 'ArrowDown', S: 'ArrowDown',
+                             a: 'ArrowLeft', A: 'ArrowLeft', d: 'ArrowRight', D: 'ArrowRight' };
+            movePokepathPlayer(keyMap[e.key] || e.key);
+        }
+    });
+
+    // Touch/swipe support
+    const canvas = document.getElementById('pokepath-canvas');
+    let touchStartX = 0, touchStartY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        e.preventDefault();
+    }, { passive: false });
+    canvas.addEventListener('touchend', (e) => {
+        if (pokepathState.isAnimating) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            movePokepathPlayer(dx > 0 ? 'ArrowRight' : 'ArrowLeft');
+        } else {
+            movePokepathPlayer(dy > 0 ? 'ArrowDown' : 'ArrowUp');
+        }
+        e.preventDefault();
+    }, { passive: false });
+
+    startPokepathGame();
+}
+
+function startPokepathGame() {
+    pokepathState.steps = 0;
+    pokepathState.playerPos = { x: 0, y: 0 };
+    pokepathState.collectedCount = 0;
+    pokepathState.caughtPokemon = [];
+    pokepathState.isAnimating = false;
+
+    document.getElementById('pokepath-reveal').style.display = 'none';
+
+    // Generate obstacles (avoid starting position)
+    pokepathState.obstacles = [];
+    for (let i = 0; i < 30; i++) {
+        const x = Math.floor(Math.random() * pokepathState.gridSize);
+        const y = Math.floor(Math.random() * pokepathState.gridSize);
+        if ((x !== 0 || y !== 0) &&
+            !pokepathState.obstacles.some(obs => obs.x === x && obs.y === y)) {
+            pokepathState.obstacles.push({ x, y, type: Math.random() > 0.5 ? 'tree' : 'bush' });
+        }
+    }
+
+    placePokePathBall();
+    pokepathState.optimalSteps = calculatePokePathOptimal();
+    updatePokepathUI();
+    drawPokepathGame();
+}
+
+function placePokePathBall() {
+    pokepathState.currentPokemon = pokemonNames[Math.floor(Math.random() * pokemonNames.length)];
+    do {
+        pokepathState.pokeballPos = {
+            x: Math.floor(Math.random() * pokepathState.gridSize),
+            y: Math.floor(Math.random() * pokepathState.gridSize)
+        };
+    } while (
+        (pokepathState.pokeballPos.x === pokepathState.playerPos.x &&
+         pokepathState.pokeballPos.y === pokepathState.playerPos.y) ||
+        pokepathState.obstacles.some(obs =>
+            obs.x === pokepathState.pokeballPos.x && obs.y === pokepathState.pokeballPos.y)
+    );
+}
+
+function calculatePokePathOptimal() {
+    const { playerPos, pokeballPos, obstacles, gridSize } = pokepathState;
+    const queue = [{ x: playerPos.x, y: playerPos.y, dist: 0 }];
+    const visited = new Set();
+    visited.add(`${playerPos.x},${playerPos.y}`);
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+        if (current.x === pokeballPos.x && current.y === pokeballPos.y) {
+            return current.dist;
+        }
+        const dirs = [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 }];
+        for (const dir of dirs) {
+            const nx = current.x + dir.dx;
+            const ny = current.y + dir.dy;
+            const key = `${nx},${ny}`;
+            if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize &&
+                !visited.has(key) &&
+                !obstacles.some(obs => obs.x === nx && obs.y === ny)) {
+                visited.add(key);
+                queue.push({ x: nx, y: ny, dist: current.dist + 1 });
+            }
+        }
+    }
+    return 0;
+}
+
+function movePokepathPlayer(direction) {
+    if (pokepathState.isAnimating) return;
+
+    let { x, y } = pokepathState.playerPos;
+    switch (direction) {
+        case 'ArrowUp':    y--; break;
+        case 'ArrowDown':  y++; break;
+        case 'ArrowLeft':  x--; break;
+        case 'ArrowRight': x++; break;
+    }
+
+    if (x < 0 || x >= pokepathState.gridSize || y < 0 || y >= pokepathState.gridSize) return;
+    if (pokepathState.obstacles.some(obs => obs.x === x && obs.y === y)) return;
+
+    pokepathState.playerPos = { x, y };
+    pokepathState.steps++;
+
+    if (x === pokepathState.pokeballPos.x && y === pokepathState.pokeballPos.y) {
+        collectPokePathBall();
+    }
+
+    updatePokepathUI();
+    drawPokepathGame();
+}
+
+function collectPokePathBall() {
+    pokepathState.collectedCount++;
+    pokepathState.isAnimating = true;
+
+    const pokemon = pokepathState.currentPokemon;
+    pokepathState.caughtPokemon.push(pokemon);
+
+    const performance = pokepathState.steps / pokepathState.optimalSteps;
+    let stars = 0;
+    if (performance <= 1.0) stars = 3;
+    else if (performance <= 1.2) stars = 2;
+    else if (performance <= 1.4) stars = 1;
+
+    // Update reveal panel elements
+    document.getElementById('pokepath-reveal-stars').textContent = '⭐'.repeat(stars);
+    document.getElementById('pokepath-reveal-name').textContent = pokemon;
+
+    const pCanvas = document.getElementById('pokepath-portrait');
+    const pCtx = pCanvas.getContext('2d');
+    pCtx.clearRect(0, 0, 150, 150);
+    drawPokemonPortrait(pCtx, pokemon, 0, 0, 150);
+
+    const reveal = document.getElementById('pokepath-reveal');
+    reveal.style.display = 'block';
+
+    function dismissReveal() {
+        clearTimeout(revealTimer);
+        reveal.removeEventListener('click', dismissReveal);
+        document.removeEventListener('keydown', onKeyDismiss);
+        reveal.style.display = 'none';
+        pokepathState.steps = 0;
+        placePokePathBall();
+        pokepathState.optimalSteps = calculatePokePathOptimal();
+        pokepathState.isAnimating = false;
+        updatePokepathUI();
+        drawPokepathGame();
+    }
+
+    function onKeyDismiss(e) {
+        if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            dismissReveal();
+        }
+    }
+
+    reveal.addEventListener('click', dismissReveal);
+    document.addEventListener('keydown', onKeyDismiss);
+    const revealTimer = setTimeout(dismissReveal, 30000);
+}
+
+function updatePokepathUI() {
+    document.getElementById('pokepath-steps').textContent = pokepathState.steps;
+    document.getElementById('pokepath-count').textContent = `⚾ ×${pokepathState.collectedCount}`;
+
+    const pokedex = document.getElementById('pokepath-pokedex');
+    if (pokepathState.caughtPokemon.length === 0) {
+        pokedex.style.display = 'none';
+        return;
+    }
+    pokedex.style.display = 'block';
+    pokedex.innerHTML = '';
+
+    const counts = {};
+    pokepathState.caughtPokemon.forEach(p => counts[p] = (counts[p] || 0) + 1);
+
+    const title = document.createElement('div');
+    title.className = 'pokedex-title';
+    title.textContent = `📖 Pokédex (${pokepathState.caughtPokemon.length} caught)`;
+    pokedex.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'pokedex-grid';
+    Object.entries(counts).forEach(([name, count]) => {
+        const badge = document.createElement('div');
+        badge.className = 'pokemon-badge';
+        const img = document.createElement('img');
+        img.src = getPokemonPortraitDataURL(name, 56);
+        img.width = 56; img.height = 56;
+        const label = document.createElement('span');
+        label.textContent = name + (count > 1 ? ` ×${count}` : '');
+        badge.appendChild(img);
+        badge.appendChild(label);
+        grid.appendChild(badge);
+    });
+    pokedex.appendChild(grid);
+}
+
+function drawPokepathGame() {
+    const canvas = document.getElementById('pokepath-canvas');
+    const ctx = canvas.getContext('2d');
+    const { gridSize, cellSize, playerPos, pokeballPos, obstacles } = pokepathState;
+
+    // Pokemon-style grass background (checkerboard)
+    for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+            ctx.fillStyle = (row + col) % 2 === 0 ? '#78c850' : '#68b840';
+            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+        }
+    }
+
+    // Draw obstacles
+    obstacles.forEach(obs => {
+        if (obs.type === 'tree') {
+            ctx.fillStyle = '#8b4513';
+            ctx.fillRect(obs.x * cellSize + 15, obs.y * cellSize + 22, 10, 14);
+            ctx.fillStyle = '#228b22';
+            ctx.beginPath();
+            ctx.arc(obs.x * cellSize + 20, obs.y * cellSize + 16, 12, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.fillStyle = '#2d5016';
+            ctx.beginPath();
+            ctx.arc(obs.x * cellSize + 20, obs.y * cellSize + 22, 13, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#3a6b1e';
+            ctx.beginPath();
+            ctx.arc(obs.x * cellSize + 14, obs.y * cellSize + 18, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(obs.x * cellSize + 26, obs.y * cellSize + 18, 9, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+
+    // Draw pokeball
+    drawPokepathBall(ctx, pokeballPos.x * cellSize + 20, pokeballPos.y * cellSize + 20, 14);
+
+    // Draw trainer player
+    drawPokepathTrainer(ctx, playerPos.x * cellSize + 20, playerPos.y * cellSize + 20);
+}
+
+function drawPokepathBall(ctx, cx, cy, r) {
+    // Red top half
+    ctx.fillStyle = '#e74c3c';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, Math.PI, 0);
+    ctx.fill();
+
+    // White bottom half
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI);
+    ctx.fill();
+
+    // Outer ring
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Dividing line
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy);
+    ctx.lineTo(cx + r, cy);
+    ctx.stroke();
+
+    // Center button outer ring
+    ctx.fillStyle = '#ecf0f1';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Center button inner
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawPokepathTrainer(ctx, cx, cy) {
+    // Body (blue shirt)
+    ctx.fillStyle = '#2980b9';
+    ctx.fillRect(cx - 7, cy + 5, 14, 13);
+
+    // Head (skin tone)
+    ctx.fillStyle = '#f5cba7';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 1, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cap (red, upper half)
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 2, 9, Math.PI, 0);
+    ctx.fill();
+
+    // Cap brim
+    ctx.fillRect(cx - 11, cy - 3, 22, 4);
+
+    // Eyes
+    ctx.fillStyle = '#2c3e50';
+    ctx.beginPath();
+    ctx.arc(cx - 3, cy + 1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + 3, cy + 1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+}
